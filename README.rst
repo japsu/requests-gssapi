@@ -1,5 +1,16 @@
+Work in progress
+================
+
+This is an attempt to reimplement `requests-kerberos` using `python-gssapi` instead
+of `python-kerberos` due to the latter not supporting Python 3.
+
+This project is work in progress. Please disregard this fork until some indication is
+given in this space to the usability of the fork.
+
+Santtu "Japsu" Pajukanta
+
 requests Kerberos/GSSAPI authentication library
-===============================================
+-----------------------------------------------
 
 Requests is an HTTP library, written in Python, for human beings. This library
 adds optional Kerberos/GSSAPI authentication support and supports mutual
