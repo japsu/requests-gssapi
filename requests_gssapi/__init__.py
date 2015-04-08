@@ -7,19 +7,18 @@ adds optional Kerberos/GSSAPI authentication support and supports mutual
 authentication. Basic GET usage:
 
     >>> import requests
-    >>> from requests_kerberos import HTTPKerberosAuth
-    >>> r = requests.get("http://example.org", auth=HTTPKerberosAuth())
+    >>> from requests_gssapi import HTTPGSSAPIAuth
+    >>> r = requests.get("http://example.org", auth=HTTPGSSAPIAuth())
 
 The entire `requests.api` should be supported.
 """
 import logging
 
-from .kerberos_ import HTTPKerberosAuth, REQUIRED, OPTIONAL, DISABLED
+from .implementation import HTTPGSSAPIAuth, REQUIRED, OPTIONAL, DISABLED
 from .exceptions import MutualAuthenticationError
-from .compat import NullHandler
 
-logging.getLogger(__name__).addHandler(NullHandler())
+logging.getLogger(__name__).addHandler(logging.NullHandler())
 
-__all__ = ('HTTPKerberosAuth', 'MutualAuthenticationError', 'REQUIRED',
+__all__ = ('HTTPGSSAPIAuth', 'MutualAuthenticationError', 'REQUIRED',
            'OPTIONAL', 'DISABLED')
 __version__ = '0.6.1'

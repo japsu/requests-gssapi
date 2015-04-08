@@ -1,6 +1,7 @@
-import kerberos
 import re
 import logging
+
+from gssapi import InitContext, GSSException, C_MUTUAL_FLAG
 
 from requests.auth import AuthBase
 from requests.models import Response
@@ -78,14 +79,15 @@ def _negotiate_value(response):
     return None
 
 
-class HTTPKerberosAuth(AuthBase):
+class HTTPGSSAPIAuth(AuthBase):
     """Attaches HTTP GSSAPI/Kerberos Authentication to the given Request
     object."""
-    def __init__(self, mutual_authentication=REQUIRED, service="HTTP"):
+    def __init__(self, mutual_authentication=REQUIRED, service="HTTP", cred=0):
         self.context = {}
         self.mutual_authentication = mutual_authentication
         self.pos = None
         self.service = service
+        self.cred = cred
 
     def generate_request_header(self, response):
         """
@@ -95,36 +97,21 @@ class HTTPKerberosAuth(AuthBase):
 
         """
         host = urlparse(response.url).hostname
+        peer_name = "{service}@{host}".format(service=self.service, host=host) # eg. HTTP@ATHENA.MIT.EDU
+
+        req_flags = (C_MUTUAL_FLAG,) if self.mutual_authentication in (REQUIRED, OPTIONAL) else ()
 
         try:
-            result, self.context[host] = kerberos.authGSSClientInit(
-                "{0}@{1}".format(self.service, host))
-        except kerberos.GSSError:
-            log.exception("generate_request_header(): authGSSClientInit() failed:")
-            return None
-
-        if result < 1:
-            log.error("generate_request_header(): authGSSClientInit() failed: "
-                      "{0}".format(result))
+            self.context[host] = InitContext(peer_name=peer_name, req_flags=req_flags, cred=self.cred)
+        except GSSException:
+            # TODO is it even possible for InitContext() to raise?
+            log.exception("generate_request_header(): InitContext() failed:")
             return None
 
         try:
-            result = kerberos.authGSSClientStep(self.context[host],
-                                                _negotiate_value(response))
-        except kerberos.GSSError:
-            log.exception("generate_request_header(): authGSSClientStep() failed:")
-            return None
-
-        if result < 0:
-            log.error("generate_request_header(): authGSSClientStep() failed: "
-                      "{0}".format(result))
-            return None
-
-        try:
-            gss_response = kerberos.authGSSClientResponse(self.context[host])
-        except kerberos.GSSError:
-            log.exception("generate_request_header(): authGSSClientResponse() "
-                      "failed:")
+            gss_response = self.context[host].step(_negotiate_value(response))
+        except GSSException:
+            log.exception("generate_request_header(): init_context.step() failed:")
             return None
 
         return "Negotiate {0}".format(gss_response)
@@ -173,7 +160,6 @@ class HTTPKerberosAuth(AuthBase):
         log.debug("handle_other(): Handling: %d" % response.status_code)
 
         if self.mutual_authentication in (REQUIRED, OPTIONAL):
-
             is_http_error = response.status_code >= 400
 
             if _negotiate_value(response) is not None:
@@ -223,15 +209,13 @@ class HTTPKerberosAuth(AuthBase):
         host = urlparse(response.url).hostname
 
         try:
-            result = kerberos.authGSSClientStep(self.context[host],
-                                                _negotiate_value(response))
-        except kerberos.GSSError:
-            log.exception("authenticate_server(): authGSSClientStep() failed:")
+            result = self.context[host].step(_negotiate_value(response))
+        except GSSException:
+            log.exception("authenticate_server(): init_context.step() failed:")
             return False
 
-        if result < 1:
-            log.error("authenticate_server(): authGSSClientStep() failed: "
-                      "{0}".format(result))
+        if not self.context[host].mutual_auth_negotiated:
+            log.error("authenticate_server(): init_context.mutual_auth_negotiated still False")
             return False
 
         log.debug("authenticate_server(): returning {0}".format(response))
@@ -263,7 +247,7 @@ class HTTPKerberosAuth(AuthBase):
         try:
             self.pos = request.body.tell()
         except AttributeError:
-            # In the case of HTTPKerberosAuth being reused and the body
+            # In the case of HTTPGSSAPIAuth being reused and the body
             # of the previous request was a file-like object, pos has
             # the file position of the previous body. Ensure it's set to
             # None.

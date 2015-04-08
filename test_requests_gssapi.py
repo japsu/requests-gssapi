@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""Tests for requests_kerberos."""
+"""Tests for requests_gssapi."""
 
 from mock import Mock, patch
 import requests
-import kerberos
-import requests_kerberos
+import gssapi
+import requests_gssapi
 import unittest
 
 # kerberos.authClientInit() is called with the service name (HTTP@FQDN) and
@@ -21,7 +21,7 @@ clientInit_error = Mock(return_value=(-1, "CTX"))
 clientStep_complete = Mock(return_value=1)
 clientStep_continue = Mock(return_value=0)
 clientStep_error = Mock(return_value=-1)
-clientStep_exception = Mock(side_effect=kerberos.GSSError)
+clientStep_exception = Mock(side_effect=gssapi.GSSException)
 
 # kerberos.authGSSCLientResponse() is called with the kerberos context which
 # was initially returned by authGSSClientInit and had been mutated by a call by
@@ -55,7 +55,7 @@ class KerberosTestCase(unittest.TestCase):
         response = requests.Response()
         response.headers = {'www-authenticate': 'negotiate token'}
         self.assertEqual(
-            requests_kerberos.kerberos_._negotiate_value(response),
+            requests_gssapi.implementation._negotiate_value(response),
             'token'
         )
 
@@ -63,7 +63,7 @@ class KerberosTestCase(unittest.TestCase):
         response = requests.Response()
         response.headers = {}
         self.assertTrue(
-            requests_kerberos.kerberos_._negotiate_value(response) is None
+            requests_gssapi.implementation._negotiate_value(response) is None
         )
 
     def test_generate_request_header(self):
@@ -74,7 +74,7 @@ class KerberosTestCase(unittest.TestCase):
             response = requests.Response()
             response.url = "http://www.example.org/"
             response.headers = {'www-authenticate': 'negotiate token'}
-            auth = requests_kerberos.HTTPKerberosAuth()
+            auth = requests_gssapi.HTTPGSSAPIAuth()
             self.assertEqual(
                 auth.generate_request_header(response),
                 "Negotiate GSSRESPONSE"
@@ -91,7 +91,7 @@ class KerberosTestCase(unittest.TestCase):
             response = requests.Response()
             response.url = "http://www.example.org/"
             response.headers = {'www-authenticate': 'negotiate token'}
-            auth = requests_kerberos.HTTPKerberosAuth()
+            auth = requests_gssapi.HTTPGSSAPIAuth()
             self.assertEqual(
                 auth.generate_request_header(response),
                 None
@@ -108,7 +108,7 @@ class KerberosTestCase(unittest.TestCase):
             response = requests.Response()
             response.url = "http://www.example.org/"
             response.headers = {'www-authenticate': 'negotiate token'}
-            auth = requests_kerberos.HTTPKerberosAuth()
+            auth = requests_gssapi.HTTPGSSAPIAuth()
             self.assertEqual(
                 auth.generate_request_header(response),
                 None
@@ -143,7 +143,7 @@ class KerberosTestCase(unittest.TestCase):
             response.connection = connection
             response._content = ""
             response.raw = raw
-            auth = requests_kerberos.HTTPKerberosAuth()
+            auth = requests_gssapi.HTTPGSSAPIAuth()
             r = auth.authenticate_user(response)
 
             self.assertTrue(response in r.history)
@@ -182,7 +182,7 @@ class KerberosTestCase(unittest.TestCase):
             response.connection = connection
             response._content = ""
             response.raw = raw
-            auth = requests_kerberos.HTTPKerberosAuth()
+            auth = requests_gssapi.HTTPGSSAPIAuth()
             r = auth.handle_401(response)
 
             self.assertTrue(response in r.history)
@@ -204,7 +204,7 @@ class KerberosTestCase(unittest.TestCase):
                                    'authorization': 'Negotiate GSSRESPONSE'
             }
 
-            auth = requests_kerberos.HTTPKerberosAuth()
+            auth = requests_gssapi.HTTPGSSAPIAuth()
             auth.context = {"www.example.org": "CTX"}
             result = auth.authenticate_server(response_ok)
 
@@ -221,7 +221,7 @@ class KerberosTestCase(unittest.TestCase):
                                    'authorization': 'Negotiate GSSRESPONSE'
             }
 
-            auth = requests_kerberos.HTTPKerberosAuth()
+            auth = requests_gssapi.HTTPGSSAPIAuth()
             auth.context = {"www.example.org": "CTX"}
 
             r = auth.handle_other(response_ok)
@@ -239,7 +239,7 @@ class KerberosTestCase(unittest.TestCase):
                                    'authorization': 'Negotiate GSSRESPONSE'
             }
 
-            auth = requests_kerberos.HTTPKerberosAuth()
+            auth = requests_gssapi.HTTPGSSAPIAuth()
             auth.context = {"www.example.org": "CTX"}
 
             r = auth.handle_response(response_ok)
@@ -255,10 +255,10 @@ class KerberosTestCase(unittest.TestCase):
             response_ok.status_code = 200
             response_ok.headers = {}
 
-            auth = requests_kerberos.HTTPKerberosAuth()
+            auth = requests_gssapi.HTTPGSSAPIAuth()
             auth.context = {"www.example.org": "CTX"}
 
-            self.assertRaises(requests_kerberos.MutualAuthenticationError,
+            self.assertRaises(requests_gssapi.MutualAuthenticationError,
                               auth.handle_response,
                               response_ok)
 
@@ -274,10 +274,10 @@ class KerberosTestCase(unittest.TestCase):
                                    'authorization': 'Negotiate GSSRESPONSE'
             }
 
-            auth = requests_kerberos.HTTPKerberosAuth()
+            auth = requests_gssapi.HTTPGSSAPIAuth()
             auth.context = {"www.example.org": "CTX"}
 
-            self.assertRaises(requests_kerberos.MutualAuthenticationError,
+            self.assertRaises(requests_gssapi.MutualAuthenticationError,
                               auth.handle_response,
                               response_ok)
 
@@ -293,11 +293,11 @@ class KerberosTestCase(unittest.TestCase):
                                    'authorization': 'Negotiate GSSRESPONSE'
             }
 
-            auth = requests_kerberos.HTTPKerberosAuth(requests_kerberos.OPTIONAL)
+            auth = requests_gssapi.HTTPGSSAPIAuth(requests_gssapi.OPTIONAL)
             auth.context = {"www.example.org": "CTX"}
 
 
-            self.assertRaises(requests_kerberos.MutualAuthenticationError,
+            self.assertRaises(requests_gssapi.MutualAuthenticationError,
                               auth.handle_response,
                               response_ok)
 
@@ -311,7 +311,7 @@ class KerberosTestCase(unittest.TestCase):
             response_ok.url = "http://www.example.org/"
             response_ok.status_code = 200
 
-            auth = requests_kerberos.HTTPKerberosAuth(requests_kerberos.OPTIONAL)
+            auth = requests_gssapi.HTTPGSSAPIAuth(requests_gssapi.OPTIONAL)
             auth.context = {"www.example.org": "CTX"}
 
             r = auth.handle_response(response_ok)
@@ -334,7 +334,7 @@ class KerberosTestCase(unittest.TestCase):
             response_500.raw = "RAW"
             response_500.cookies = "COOKIES"
 
-            auth = requests_kerberos.HTTPKerberosAuth()
+            auth = requests_gssapi.HTTPGSSAPIAuth()
             auth.context = {"www.example.org": "CTX"}
 
             r = auth.handle_response(response_500)
@@ -366,7 +366,7 @@ class KerberosTestCase(unittest.TestCase):
             response_500.raw = "RAW"
             response_500.cookies = "COOKIES"
 
-            auth = requests_kerberos.HTTPKerberosAuth(requests_kerberos.OPTIONAL)
+            auth = requests_gssapi.HTTPGSSAPIAuth(requests_gssapi.OPTIONAL)
             auth.context = {"www.example.org": "CTX"}
 
             r = auth.handle_response(response_500)
@@ -403,7 +403,7 @@ class KerberosTestCase(unittest.TestCase):
             response._content = ""
             response.raw = raw
 
-            auth = requests_kerberos.HTTPKerberosAuth()
+            auth = requests_gssapi.HTTPGSSAPIAuth()
             auth.handle_other = Mock(return_value=response_ok)
 
             r = auth.handle_response(response)
@@ -426,7 +426,7 @@ class KerberosTestCase(unittest.TestCase):
             response = requests.Response()
             response.url = "http://www.example.org/"
             response.headers = {'www-authenticate': 'negotiate token'}
-            auth = requests_kerberos.HTTPKerberosAuth(service="barfoo")
+            auth = requests_gssapi.HTTPGSSAPIAuth(service="barfoo")
             auth.generate_request_header(response),
             clientInit_error.assert_called_with("barfoo@www.example.org")
 
